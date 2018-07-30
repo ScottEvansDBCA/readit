@@ -1,0 +1,68 @@
+<head>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <a class="navbar-brand" href="/blog/">Readit</a>
+        <button class="navbar-toggler" type-"button" data-toggler"collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-Nav mr-auto mt-2 mt-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link" href="/blog/">Home</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/blog/Categories">Categories</a>
+                </li>
+            </ul>  
+            <form class="form-inline mr-auto my-lg-0" method="GET" action="{% url 'blog:search' %}">
+                <input class="form-control mr-sm-2" name="search" type="search" placeholder="Search" aria-label="Search">
+                <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Search</button>
+            </form>
+            <span class="navbar-text">
+                {% if user.is_authenticated %}
+                    Welcome, {{ user.get_username }}. <a href="{% url 'blog:logout' %}">Logout</a>
+                {% else %}
+                    <a href={% url 'blog:login' %}>Log in</a>
+                {% endif %}
+            </span>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% if user.is_authenticated %}
+            Welcome, {{ user.get_username }}.
+
+            {% if posts.count == 1 %}
+                <p>You have 1 post.</p>
+                
+            {% else %}
+                <p>You have {{ posts.count }} posts.</p>
+            {% endif %}
+            <table style="width:100%; border: 1px solid black;">
+                    <tr>
+                        <th style="border: 1px solid black;">Post Title</th>
+                        <th style="border: 1px solid black;">Post Date Created</th>
+                        <th style="border: 1px solid black;">Post Categories</th>
+                        <th style="border: 1px solid black;">Edit/Delete</th>
+                    </tr>
+                    {% for post in posts %}
+                        <tr>
+                            <td style="border: 1px solid black;"><a href="{% url 'blog:detail' post.id %}">{{ post.title }}</a></td>
+                            <td style="border: 1px solid black;">{{ post.create_date }}</td>
+                            <td style="border: 1px solid black;">{% for category in post.categories.all %}
+                                <a href="{% url 'blog:category' category.id %}" >{{ category.name }} </a>,
+                                {% endfor %}</td>
+                            <td style="border: 1px solid black;">TODO- Place here an edit & del button</td>
+                        </tr>
+                    {% endfor %}
+                </table>
+        {% else %}
+            <a href={% url 'blog:login' %}>Log in</a>
+        {% endif %}
+    </div>
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+</body>
