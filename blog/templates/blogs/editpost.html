@@ -1,5 +1,9 @@
 <head>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.2.0/css/all.css" integrity="sha384-hWVjflwFxL6sNzntih27bfxkr27PmbbK/iSvJ+a4+0owXq79v+lsFkW54bOGbiDQ" crossorigin="anonymous">
+    {% block pagedown %}
+        {{ form.media }}
+    {% endblock pagedown %}
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -29,25 +33,27 @@
         </span>
     </div>
 </nav>
-
+{% load crispy_forms_tags %}
 <div class="container">
     {% if user.is_authenticated %}
+        <a href="{% url 'blog:profile_view' %}" style="position:fixed;bottom:10px;right:80px;"><i class="fas fa-user-circle fa-4x"></i></a>
+        <a href="{% url 'blog:new_post' %}"style="position:fixed;bottom:10px;right:10px;" ><i class="fas fa-pen-square fa-4x"></i></a>
+
         {% if user.get_username == post.create_by %}
         <h1>Edit {{ title }}</h1>
             <form action="edit" method="POST">
                 {% csrf_token %}
-                <label for="title">Title: </label>
-                <input id="post_title" type="text" name="title" value="{{ post.title }}"/>
-                <br/>
-                <textarea id="post_content" name="content" value="" style="width:100%; height:60%; margin-top:1%;">{{ post.content }}</textarea>
-                <br/>
-                <input id="post_categories" type="text" name="categories" value="{% for category in post.categories.all %}{{ category.name }}, {% endfor %}" style="width:100%;margin-top:2%;"/>
-                <br/>
-                <button class="btn btn-secondary" id="submit" type="submit" style=margin-top:1%;>Submit</button>
+                {% for err in form.non_field_errors %}
+                    <p class="form-error">{{ err }}</p>
+                {% endfor %}
+                {{ form|crispy }}
+                <div class="buttons" style="margin-top:1%;">
+                    <button class="btn btn-secondary" id="submit" type="submit">Submit</button>
+                    <button class="btn btn-danger" id="delete" type="submit" formaction="{% url 'blog:delete' post.pk %}" formmethod="GET">Delete</button>
+                </div>
             </form>
-            <form action="{% url 'blog:delete' post.pk %}">
-                <button class="btn btn-danger" name="delete" id="delete" type="submit" style="margin-top:1%;">Delete</button>
-            </form>
+            
+            
         {% else %}
             <h3>Please log in as original poster to edit this post.</h3>
         {% endif %}

@@ -15,5 +15,12 @@ class Post(models.Model):
     create_by = models.CharField(max_length=200)
     categories = models.ManyToManyField(Category)
 
+    def categories_as_string(self):
+        cats_string = ""
+        for category in self.categories.all():
+            cats_string += category.name.title()
+            cats_string += ", "
+        return cats_string
+
     def __str__(self):
         return self.title

@@ -2,15 +2,17 @@ from .models import Category, Post
 from .forms import PostForm
 from django.http import HttpResponse, HttpResponseRedirect
 from django.template import loader
-from django.shortcuts import get_object_or_404, render, redirect
+from django.shortcuts import get_object_or_404, render, redirect, render_to_response
 from django.urls import reverse
 from django.views import generic
 from django.utils import timezone
+from django.forms.utils import ErrorList
 from django.contrib import auth
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
+from bs4 import BeautifulSoup
 
-
+VALID_TAGS = ['strong','em','p','ul','li','br','b','h1','h2','h3','h4','h5','h6','ol','i','a','dl','s','hr','sup','sub']
 
 class IndexView(generic.ListView):
     """
@@ -53,148 +55,141 @@ class PostView(generic.DetailView):
     model = Post
     template_name = 'blogs/post.html'
 
-
-
-def search(request):
+class SearchView(generic.ListView):
     """
-    This will allow users to search the entire posts for any text
+    This will display the search the user has provided from the search bar on any other page.
     """
-    template = 'blogs/search.html'
-    query = request.GET.get('search')
-    results = Post.objects.filter(Q(content__icontains=query) | Q(title__icontains=query)).order_by('-create_date')
+    context_object_name = 'results'
+    template_name = 'blogs/search.html'
 
-    context = {
-        'results': results
-    }
+    def get_queryset(self):
+        try:
+            query = self.request.GET.get('search')
+        except:
+            query = ''
+        print(query)
+        if (query != ''):
+            results = Post.objects.filter(Q(content__icontains=query) | Q(title__icontains=query)).order_by('-create_date')
+            print(results)
+        else:
+            results = Post.objects.all()
+        return results
 
-    return render(request, template, context)
-
-        
-def profile(request):
+class ProfileView(generic.ListView):
     """
     This will display users account information.
     """
-    un = request.user.username
-    posts = Post.objects.filter(create_by=un).order_by('-create_date')
-    t = loader.get_template('blogs/account.html')
-    context = {
-        'posts' : posts,
-    }
+    template_name = 'blogs/account.html'
+    context_object_name = 'posts'
 
-    return HttpResponse(t.render(context, request))
+    def get_queryset(self):
+        un = self.request.user.username
+        posts = Post.objects.filter(create_by=un).order_by('-create_date')
+
+        return posts
+        
+class CreatePostView(generic.CreateView):
+    """
+    This will handle the creation of new posts.
+    """
+    model = Post
+    template_name = 'blogs/createpost.html'
+    success_url='/'
+    form_class = PostForm
     
-def createpost(request):
-    if request.POST:
-        title = request.POST.get('title')
-        content = request.POST.get('content')
-        cats_as_string = request.POST.get('categories')
+    def form_valid(self, form):
+        title = self.request.POST.get('title')
+        cont = self.request.POST.get('content')
+        content = sanitize_html(cont).decode('utf-8')
+        cats_as_string = self.request.POST.get('category_csv')
+        username=self.request.user.username
+        if (cats_as_string == '' or cats_as_string == ' '):
+            form.add_error(None, "Categories cannot be empty, please add at least 1.")
+            print(form.errors)
+            return self.render_to_response(self.get_context_data(form=form))
         time_now = timezone.now()
-        if title != "New post" and title != "":
-            if content != "":
-                if cats_as_string!="Categories comma seperated" and cats_as_string != "":
-                    #valid input, save and continue to post page
-                    categories = cats_as_string.split(",")
-                    post = Post(title=title, content=content, create_date=time_now, create_by=request.user.username)
-                    post.save()
-                    for category in categories:
-                        if category == "" or category == " ":
-                            pass
-                        else:
-                            category = category.strip()
-                            category = category.upper()
-                            cat_exists = Category.objects.filter(name=category).first()
-                            if cat_exists:
-                                post.categories.add(cat_exists)
-                                post.save()
-                            else:
-                                #DB must have been initialised with at least 1 category otherwise following line will fail.
-                                maxid = Category.objects.all().order_by('-id')[0].id
-                                maxid += 1
-                                slug = category.replace(" ", "-")
-                                cat = Category(name=category, slug=slug)
-                                cat.save()
-                                post.categories.add(cat)
-                                post.save()
-                    post_id = Post.objects.filter(title=title, create_by=request.user.username, create_date=time_now)[0].id
-                    return HttpResponseRedirect("Posts/%s" % post_id)
-                else:
-                    #reject due to blank categories
-                    t = loader.get_template('blogs/createpost.html')
-                    context = {
-                        'error': "*Post is uncategorized, please enter at least 1 category.",
-                        'title': title,
-                        'content': content,
-                        'categories': cats_as_string,
-                    }
-                    return HttpResponse(t.render(context, request))
-            else:
-                #reject due to no content
-                t = loader.get_template('blogs/createpost.html')
-                context = {
-                    'error': "*Post is blank, please enter some content.",
-                    'title': title,
-                    'content': content,
-                    'categories': cats_as_string,
-                }
-                return HttpResponse(t.render(context, request))
-        else:
-            #reject due to unnamed post
-            t = loader.get_template('blogs/createpost.html')
-            context = {
-                'error': "*Post has no title, please enter a title.",
-                'title': title,
-                'content': content,
-                'categories': cats_as_string,
-            }
-            return HttpResponse(t.render(context, request))
+        categories = cats_as_string.split(",")
+        post = Post(title=title, content=content, create_date=time_now, create_by=username)
+        post.save()
+        check_categories(categories, post)
+        post_id = Post.objects.filter(title=title, create_by=username, create_date=time_now)[0].id
+        return HttpResponseRedirect("Posts/%s" % post_id)
+                   
 
-    else:    
-        t = loader.get_template('blogs/createpost.html')
-        context = {
-        }
-        return HttpResponse(t.render(context, request))
+class EditPostView(generic.UpdateView):
+    """
+    This view will allow users to edit a post.
+    """
+    model = Post
+    template_name = 'blogs/editpost.html'
+    form_class = PostForm
+
+    def get_initial(self):
+        post = self.get_object()
+        return {'category_csv': Post.categories_as_string(post), 'title': post.title, 'content': post.content}
 
 
-def editpost(request, pk):
-    post = get_object_or_404(Post, pk=pk)
-    if request.POST:
-        form = PostForm(request.POST, instance=post)
-        cats_as_string = request.POST.get('categories')
-        categories = cats_as_string.split(',')     
+    def form_valid(self, form):
+        cats_as_string = self.request.POST.get('category_csv')
+        if (cats_as_string == '' or cats_as_string == ' '):
+            form.add_error(None, "Categories cannot be empty, please add at least 1.")
+            print(form.errors)
+            return self.render_to_response(self.get_context_data(form=form))
+        categories = cats_as_string.split(',')
         post = form.save(commit=False)
+        new_content = self.request.POST.get('content')
+        post.content = sanitize_html(new_content).decode('utf-8')
         post.categories.clear()
-        for category in categories:
-            category = category.strip()
-            category = category.upper()
+        check_categories(categories, post)
+        post.save()
+        return HttpResponseRedirect("/blog/Posts/%s" % post.id)
+
+class DeletePostView(generic.DeleteView):
+    """
+    This will be used to allow users to delete a post after confirming.
+    """
+    template_name = 'blogs/delete.html'
+    
+    def get_object(self):
+        id = self.kwargs.get("pk")
+        return get_object_or_404(Post, id=id)
+
+    def post(self, request, *args, **kwargs):
+        """
+        This is being overridden so that we can cleanup categories at the same time.
+        When a user deletes a post, if any of the categories were only linked to
+        that 1 post, the category itself is deleted. Just as a bit of db maintenance.
+        """
+        post = Post.objects.filter(id=self.kwargs.get("pk")).first()
+        for category in post.categories.all():
+            if category.post_set.all().count() == 1:
+                category.delete()
+        return self.delete(request, *args, **kwargs)
+
+    def get_success_url(self):
+        return reverse('blog:index')
+
+def sanitize_html(value):
+
+    soup = BeautifulSoup(value)
+
+    for tag in soup.findAll(True):
+        if tag.name not in VALID_TAGS:
+            tag = tag.extract()
+    return soup.renderContents()
+
+def check_categories(categories, post):
+    for category in categories:
             if category == "" or category == " ":
                 pass
-            elif category in post.categories.all():
-                pass
             else:
+                category = category.strip()
+                category = category.upper()
                 cat_exists = Category.objects.filter(name=category).first()
                 if cat_exists:
                     post.categories.add(cat_exists)
-                    post.save()
                 else:
-                    #DB must have been initialised with at least 1 category otherwise following line will fail.
-                    maxid = Category.objects.all().order_by('-id')[0].id
-                    maxid += 1
                     slug = category.replace(" ", "-")
                     cat = Category(name=category, slug=slug)
                     cat.save()
                     post.categories.add(cat)
-        if form.is_valid():
-            post.save()
-            return HttpResponseRedirect("/blog/Posts/%s" % pk)
-    else:
-        form = PostForm(instance=post)
-    return render(request, "blogs/editpost.html", {'post': post, 'form': form})
-
-def deletepost(request, pk):
-    post = Post.objects.filter(pk=pk).first()
-    return render(request, "blogs/delete.html", {'post': post})
-
-def deleteconfirmed(request, pk):
-    post = Post.objects.filter(pk=pk).first()
-    post.delete()
-    return HttpResponseRedirect("/blog/")
