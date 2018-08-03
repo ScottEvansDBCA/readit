@@ -67,10 +67,8 @@ class SearchView(generic.ListView):
             query = self.request.GET.get('search')
         except:
             query = ''
-        print(query)
         if (query != ''):
             results = Post.objects.filter(Q(content__icontains=query) | Q(title__icontains=query)).order_by('-create_date')
-            print(results)
         else:
             results = Post.objects.all()
         return results
