@@ -1,5 +1,7 @@
 from .models import Category, Post
 from .forms import PostForm
+from .serializers import PostSerializer, UserSerializer
+from .permissions import IsOwnerOrReadOnly
 from django.http import HttpResponse, HttpResponseRedirect
 from django.template import loader
 from django.shortcuts import get_object_or_404, render, redirect, render_to_response
@@ -8,8 +10,11 @@ from django.views import generic
 from django.utils import timezone
 from django.forms.utils import ErrorList
 from django.contrib import auth
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.db.models import Count, Q
+from rest_framework import generics, permissions, viewsets
+from rest_framework.decorators import action, api_view
+from rest_framework.response import Response
 from bs4 import BeautifulSoup
 
 VALID_TAGS = ['strong','em','p','ul','li','br','b','h1','h2','h3','h4','h5','h6','ol','i','a','dl','s','hr','sup','sub']
@@ -81,7 +86,7 @@ class ProfileView(generic.ListView):
     context_object_name = 'posts'
 
     def get_queryset(self):
-        un = self.request.user.username
+        un = self.request.user
         posts = Post.objects.filter(create_by=un).order_by('-create_date')
 
         return posts
@@ -100,17 +105,17 @@ class CreatePostView(generic.CreateView):
         cont = self.request.POST.get('content')
         content = sanitize_html(cont).decode('utf-8')
         cats_as_string = self.request.POST.get('category_csv')
-        username=self.request.user.username
+        user=self.request.user
         if (cats_as_string == '' or cats_as_string == ' '):
             form.add_error(None, "Categories cannot be empty, please add at least 1.")
             print(form.errors)
             return self.render_to_response(self.get_context_data(form=form))
         time_now = timezone.now()
         categories = cats_as_string.split(",")
-        post = Post(title=title, content=content, create_date=time_now, create_by=username)
+        post = Post(title=title, content=content, create_date=time_now, create_by=user)
         post.save()
         check_categories(categories, post)
-        post_id = Post.objects.filter(title=title, create_by=username, create_date=time_now)[0].id
+        post_id = Post.objects.filter(title=title, create_by=user, create_date=time_now)[0].id
         return HttpResponseRedirect("Posts/%s" % post_id)
                    
 
@@ -167,8 +172,35 @@ class DeletePostView(generic.DeleteView):
     def get_success_url(self):
         return reverse('blog:index')
 
-def sanitize_html(value):
+class PostViewSet(viewsets.ModelViewSet):
+    """
+    This viewset automatically provides 'list', 'create', 'retrieve'
+    'update' and 'destroy' actions.
+    """
+    queryset = Post.objects.all()
+    serializer_class = PostSerializer
+    permission_classes =  (permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly)
 
+    def perform_create(self, serializer):
+        serializer.save(create_by=self.request.user)
+
+
+class UserViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    This viewset automatically provides 'list' and 'detail' actions
+    for viewing data on users.
+    """
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+
+@api_view(['GET'])
+def api_root(request, format=None):
+    return Response({
+        'users': reverse('blog:usersapi', request=request, format=format),
+        'posts': reverse('blog:postsapi', request=request, format=format)
+    })
+
+def sanitize_html(value):
     soup = BeautifulSoup(value)
 
     for tag in soup.findAll(True):

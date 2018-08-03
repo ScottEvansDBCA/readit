@@ -34,7 +34,7 @@
     <div class="container">
         <h1>{{ post.title }}</h1>
 
-        <p><b>Created: {{ post.create_date }}  {% if user.get_username == post.create_by %} 
+        <p><b>Created: {{ post.create_date }}  {% if user.get_user == post.create_by %} 
             <a class="btn btn-default" href="{% url 'blog:edit' pk=post.pk %}" style="color:grey"><i class="fas fa-edit fa-lg"></i></a>
             {% endif %}
             <br/> Published by: {{ post.create_by }} </b></p>

@@ -50,7 +50,7 @@
         <ul style="margin-top:3%;">
         {% for post in latest_posts_list %}
             <li><a href="{% url 'blog:detail' post.id %}"><div class="container-for-post" style="width:80%;"><h5>{{ post.title }}</h5>
-                <div class="container" style="overflow:hidden;color:grey;font-size:12px;"><div class="a" style="text-align: left;float:left;">Posted: {{ post.create_date }}</div><div class="b" style="text-align: right;overflow:hidden">By: {{ post.create_by|title }}</div></div>
+                <div class="container" style="overflow:hidden;color:grey;font-size:12px;"><div class="a" style="text-align: left;float:left;">Posted: {{ post.create_date }}</div><div class="b" style="text-align: right;overflow:hidden">By: {{ post.create_by }}</div></div>
                 </div></a>
             </li>
         {% endfor %}
