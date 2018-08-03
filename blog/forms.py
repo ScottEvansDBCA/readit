@@ -2,7 +2,7 @@ from django import forms
 from .models import Post
 
 class PostForm(forms.ModelForm):
-    category_csv = forms.CharField(required=True)
+    category_csv = forms.CharField(required=True, label='Categories (comma serparated)')
 
     class Meta:
         model = Post

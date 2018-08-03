@@ -31,12 +31,12 @@
         </div>
     </nav>
 
-    <div class="container">
-        <h1>All blog categories</h1>
+    <div class="container" style="margin-top:2%">
+        <h1 style="text-align:center;">All blog categories</h1>
         {% if all_categories_list %}
         <ul>
             {% for category in all_categories_list %}
-            <li><a href="{% url 'blog:category' category.id %}">{{ category.name|title }}</a></li>
+            <li style="font-size:20px;"><a href="{% url 'blog:category' category.id %}">{{ category.name|title }}</a></li>
             {% endfor %}
         </ul>
         {% else %}

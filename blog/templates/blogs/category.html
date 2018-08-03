@@ -31,13 +31,13 @@
         </div>
     </nav>
 
-    <div class="container">
+    <div class="container" style="margin-top:2%;">
 
-        <h1>{{ category.name|title }}</h1>
+        <h1 style="text-align:center;">{{ category.name|title }}</h1>
         <p>
             <ul>
                 {% for post in category.post_set.all %}
-                    <li><a href="{% url 'blog:detail' post.id %}" >{{ post.title }} </a></li>
+                    <li style="font-size:20px;"><a href="{% url 'blog:detail' post.id %}" >{{ post.title|title }} </a></li>
                 {% endfor %}
             </ul>
         </p>
