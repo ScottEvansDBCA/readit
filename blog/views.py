@@ -2,7 +2,7 @@ from .models import Category, Post
 from .forms import PostForm
 from .serializers import PostSerializer, UserSerializer
 from .permissions import IsOwnerOrReadOnly
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader
 from django.shortcuts import get_object_or_404, render, redirect, render_to_response
 from django.urls import reverse
@@ -12,7 +12,7 @@ from django.forms.utils import ErrorList
 from django.contrib import auth
 from django.contrib.auth.models import User
 from django.db.models import Count, Q
-from rest_framework import generics, permissions, viewsets
+from rest_framework import generics, permissions, viewsets, status
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from bs4 import BeautifulSoup
@@ -184,6 +184,23 @@ class PostViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(create_by=self.request.user)
 
+    def destroy(self, request, *args, **kwargs):
+        """
+        This is being overridden so that we can cleanup categories at the same time.
+        When a user deletes a post, if any of the categories were only linked to
+        that 1 post, the category itself is deleted. Just as a bit of db maintenance.
+        """
+        post = Post.objects.filter(id=self.kwargs.get("pk")).first()
+        for category in post.categories.all():
+            if category.post_set.all().count() == 1:
+                category.delete()
+        try:
+            instance = self.get_object()
+            self.perform_destroy(instance)
+        except Http404:
+            pass
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -201,6 +218,10 @@ def api_root(request, format=None):
     })
 
 def sanitize_html(value):
+    """
+    Removes 'dangerous' html and only allows content within tags that are
+    pre-approved above in variable VALID_TAGS.
+    """
     soup = BeautifulSoup(value)
 
     for tag in soup.findAll(True):
@@ -209,6 +230,10 @@ def sanitize_html(value):
     return soup.renderContents()
 
 def check_categories(categories, post):
+    """
+    Takes the categories that are user entered, and if they exist already add
+    them to that post. If not they are added as a new category.
+    """
     for category in categories:
             if category == "" or category == " ":
                 pass
